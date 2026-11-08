@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Academic Visual Storytelling — Renderer Template</title>
+<!-- ============================================================
+  MINIMAL STARTER RENDERER
+  ────────────────────────────────────────────────────────────
+  A film is a SCENES registry: each scene {id,a,b,tick} paints
+  itself as a pure function of LOCAL time (tl = t - a).
+  All beats come from timeline.json (never hardcoded seconds):
+    L(chap,k)  = local start of narration line k
+    LD(chap,k) = local duration of narration line k
+  Inject the timeline: python inject_timeline.py (fills __TIMELINE__).
+  Render:  node capture.js   → JPEG frames → encode.sh
+  Preview: ?render=1 exposes window.SEEK(t seconds).
+============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --panel:#FFFFFF; --ink:#1F1E1D; --mut:#8A8178; --line:#EAE3D8;
+  --focus:#C05621; --signal:#4D8B7E; --risk:#C74A2E; --gold:#C49A3B;
+  --serif:'Playfair Display',Georgia,serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#20242B;display:flex;align-items:center;justify-content:center;min-height:100vh}
+#stage{position:relative;width:1920px;height:1080px;background:var(--bg);overflow:hidden;
+  container-type:inline-size;font-family:'Space Grotesk',system-ui,sans-serif;color:var(--ink)}
+#stage::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(31,30,29,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(31,30,29,.045) 1px,transparent 1px),
+    radial-gradient(rgba(107,98,89,.09) 1px,transparent 1px);
+  background-size:120px 120px,120px 120px,46px 46px}
+.scene{position:absolute;inset:0;visibility:hidden;z-index:1}
+.mono{font-family:'IBM Plex Mono',monospace}
+.viz{position:absolute;inset:0;width:100%;height:100%}
+/* chapter anchor: kicker + serif headline */
+.chap{position:absolute;left:80px;top:56px;z-index:2}
+.chap .k{font-size:20px;letter-spacing:.3em;color:var(--signal)}
+.chap .t{font-family:var(--serif);font-size:58px;font-weight:700;margin-top:10px;line-height:1.05}
+/* artifact card */
+.art{background:var(--panel);border:1px solid rgba(31,30,29,.07);border-radius:20px;
+  box-shadow:0 14px 44px rgba(31,30,29,.08)}
+/* persistent HUD */
+.hud{position:absolute;inset:0;pointer-events:none;z-index:7}
+.hud-line{position:absolute;top:0;left:0;right:0;height:3px;background:rgba(31,30,29,.10)}
+.hud-fill{height:100%;width:0;background:var(--signal)}
+#hud-ch,#hud-tc{position:absolute;bottom:34px;font-size:19px;letter-spacing:.18em;color:var(--mut)}
+#hud-ch{left:42px}#hud-tc{right:42px}
+/* chapter transition wipe */
+.wipe{position:absolute;top:0;bottom:0;width:5px;background:var(--signal);
+  box-shadow:0 0 30px 8px rgba(77,139,126,.45);opacity:0;z-index:8}
+/* captions: no box, word-by-word highlight */
+#cap{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);max-width:1460px;
+  text-align:center;font-size:28px;line-height:1.5;color:rgba(31,30,29,.30);font-weight:500;
+  opacity:0;z-index:9;text-shadow:0 1px 10px rgba(250,247,242,.95)}
+#cap.top{bottom:auto;top:22px;max-width:1600px}
+#cap .cw{transition:color .15s}
+#cap .cw.on{color:var(--ink)}
+#cap .cw.on.kw{color:var(--focus)}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- SCENE 01 · demo: plate + odometer (replace with your chapters) -->
+  <section class="scene" id="sc-hello">
+    <div class="chap"><div class="k mono">CH 01 · HELLO</div><div class="t">Your title here.</div></div>
+    <div id="plate" class="art" style="position:absolute;left:16%;right:16%;top:30%;bottom:30%;opacity:0"></div>
+    <div style="position:absolute;left:16%;right:16%;top:34%;text-align:center">
+      <div class="mono" id="kicker" style="font-size:20px;letter-spacing:.28em;color:var(--signal);opacity:0">NOMINAL ACTIVATION DEMO</div>
+      <div id="big" class="stat-big" style="font-size:150px;font-weight:700;margin-top:20px;opacity:0">0</div>
+      <div id="sub" style="font-size:26px;color:var(--mut);margin-top:14px;opacity:0">A sculptural odometer springs to its target while the narration speaks.</div>
+    </div>
+  </section>
+
+  <!-- SCENE 02 · demo: mechanism chain (pulse travels, last node stays hollow) -->
+  <section class="scene" id="sc-chain">
+    <div class="chap"><div class="k mono">CH 02 · CHAIN</div><div class="t">One pulse, three nodes.</div></div>
+    <div style="position:absolute;left:12%;width:76%;top:44%;height:2px;background:var(--line);transform-origin:left" id="cn-line"></div>
+    <div id="cn-nodes" style="position:absolute;left:12%;width:76%;top:44%"></div>
+    <div id="cn-pulse" style="position:absolute;top:44%;width:21px;height:21px;border-radius:50%;background:var(--signal);box-shadow:0 0 26px 6px rgba(77,139,126,.5);transform:translate(-50%,-50%);opacity:0;z-index:2"></div>
+  </section>
+
+  <div class="hud">
+    <div class="hud-line"><div class="hud-fill" id="hud-fill"></div></div>
+    <div id="hud-ch" class="mono">CH 01 / 2</div>
+    <div id="hud-tc" class="mono">0:00</div>
+  </div>
+  <div id="wipe"></div>
+  <div id="cap"></div>
+</div>
+
+<script>
+/* ================= timeline (injected) ================= */
+const TL = __TIMELINE__;
+const TOTAL = TL.total;
+const $ = id => document.getElementById(id);
+/* ================= helpers ================= */
+const clamp01 = x => x<0?0:x>1?1:x;
+const remap = (t,a,b) => clamp01((t-a)/(b-a));
+const eo = x => 1-Math.pow(1-x,4);                       // easeOutQuart
+const eoe = x => x>=1?1:1-Math.pow(2,-10*x);             // easeOutExpo
+const sm = x => {x=clamp01(x);return x*x*(3-2*x)};       // smoothstep
+const lerp = (a,b,m) => a+(b-a)*m;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const CH = {}; TL.chapters.forEach(c => CH[c.id] = c);
+const L  = (c,k) => CH[c].lines[k].off - CH[c].start;    // local line start
+const LD = (c,k) => CH[c].lines[k].dur;                  // line duration
+function popIn(el,p,dy=22){el.style.opacity=p;el.style.transform=`translateY(${(1-p)*dy}px)`;}
+function splitWords(el){const words=[];[...el.childNodes].forEach(n=>{
+  if(n.nodeType===3){n.textContent.split(/\s+/).forEach(w=>{if(w)words.push({t:w,cls:''});});}
+  else{const w2=n.textContent.trim();if(w2)words.push({t:w2,cls:n.className});}});
+  el.textContent='';const spans=[];
+  words.forEach(w=>{const s=document.createElement('span');s.className='w'+(w.cls?' '+w.cls:'');
+    s.textContent=w.t;el.appendChild(s);el.appendChild(document.createTextNode(' '));spans.push(s);});
+  return spans;}
+
+/* ================= captions (word-by-word) ================= */
+const capEl=$('cap');
+const KW=new Set(['DNA','AI','data','signals','signal','evidence']);
+let capWords=[];
+function updateCaption(t){
+  let best=null,bc=null;
+  for(const c of TL.chapters)for(const l of c.lines){
+    if(t>=l.off-0.15&&t<=l.off+l.dur+0.3){best=l;bc=c.id;break;}}
+  if(best){
+    const key=best.off+'';
+    if(capEl.dataset.t!==key){
+      capEl.dataset.t=key;capEl.textContent='';capWords=[];
+      const words=best.text.split(/\s+/);let acc=0;const total=best.text.length||1;
+      words.forEach(w=>{const sp=document.createElement('span');sp.className='cw';
+        sp.textContent=w+' ';capEl.appendChild(sp);acc+=w.length+1;
+        capWords.push({el:sp,at:best.off+best.dur*Math.min(1,acc/total)});});
+    }
+    capWords.forEach(w=>w.el.classList.toggle('on',t>=w.at-.05));
+    capEl.classList.toggle('top',TOP_CH.has(bc));
+    capEl.style.opacity='1';
+  } else capEl.style.opacity='0';
+}
+const TOP_CH=new Set();   // add chapter ids whose captions sit on top
+
+/* ================= HUD ================= */
+function updateHUD(t){
+  $('hud-fill').style.width=(t/TOTAL*100).toFixed(2)+'%';
+  let ci=TL.chapters.length-1;
+  for(let i=0;i<TL.chapters.length;i++){if(t<TL.chapters[i].end){ci=i;break;}}
+  $('hud-ch').textContent=`CH ${String(ci+1).padStart(2,'0')} / ${TL.chapters.length} · ${TL.chapters[ci].name.toUpperCase()}`;
+  const f=v=>`${Math.floor(v/60)}:${String(Math.floor(v%60)).padStart(2,'0')}`;
+  $('hud-tc').textContent=`${f(t)} / ${f(TOTAL)}`;
+}
+
+/* ================= SCENE 01: odometer ================= */
+function tickHello(tl){
+  popIn($('plate'),sm(remap(tl,.4,1.4)),22);
+  popIn($('kicker'),sm(remap(tl,.8,1.4)),10);
+  const p=eoe(remap(tl,1.2,2.6));
+  const big=$('big');big.style.opacity=p.toFixed(3);
+  big.textContent=Math.round(4930*p).toLocaleString('en-US');
+  popIn($('sub'),sm(remap(tl,2.4,3.0)),12);
+}
+
+/* ================= SCENE 02: chain ================= */
+(function(){
+  const nodes=[['ONE','the concept'],['TWO','the mechanism'],['THREE','the decision']];
+  const wrap=$('cn-nodes');
+  nodes.forEach((n,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText=`position:absolute;left:${i*33.3}%;top:0;transform:translate(-50%,-50%);text-align:center;opacity:0`;
+    d.innerHTML=`<div class="nring" style="width:88px;height:88px;border-radius:50%;border:3px solid var(--signal);background:var(--panel);margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--signal)">${i+1}</div><div class="mono" style="margin-top:20px;font-size:24px;letter-spacing:.14em;font-weight:500">${n[0]}</div><div class="mono" style="margin-top:6px;font-size:18px;color:var(--mut)">${n[1]}</div>`;
+    wrap.appendChild(d);
+  });
+})();
+function tickChain(tl){
+  $('cn-line').style.transform='scaleX('+eo(remap(tl,.3,1.2)).toFixed(3)+')';
+  const rings=[...$('cn-nodes').children].map(d=>d.querySelector('.nring'));
+  const bt=[.6,1.6,2.6],pp=eo(remap(tl,.8,3.2)),px=50*pp;
+  $('cn-pulse').style.opacity=(pp>0&&pp<1)?'1':'0';
+  $('cn-pulse').style.left=px.toFixed(2)+'%';
+  [...$('cn-nodes').children].forEach((d,i)=>{
+    const p=eoe(remap(tl,bt[i],bt[i]+.6));popIn(d,p,0);
+    d.style.transform=`translate(-50%,-50%) scale(${(.7+.3*p).toFixed(3)})`;
+    const lit=px>33.3*i-1;
+    rings[i].style.borderColor=lit?'var(--signal)':'var(--line)';
+    rings[i].style.color=lit?'var(--signal)':'var(--mut)';
+  });
+}
+
+/* ================= registry & render loop ================= */
+const SCENES=[
+  {id:'sc-hello',a:0,b:CH.hello.end,tick:tickHello},
+  {id:'sc-chain',a:CH.chain.start,b:CH.chain.end,tick:tickChain},
+];
+const wipeEl=$('wipe');
+const BOUNDS=SCENES.slice(1).map(s=>s.a);
+function render(t){
+  for(let i=0;i<SCENES.length;i++){
+    const s=SCENES[i];let o;
+    if(t<s.a-.5||t>s.b+.5){o=0;}
+    else{
+      const fin=i===0?1:sm(remap(t,s.a,s.a+.5));
+      const fout=i===SCENES.length-1?1:1-sm(remap(t,s.b-.5,s.b));
+      o=Math.min(fin,fout);
+    }
+    if(o<=0){s.el.style.visibility='hidden';continue;}
+    s.el.style.visibility='visible';
+    s.el.style.opacity=o.toFixed(3);
+    s.tick(t-s.a);
+  }
+  let wOn=false;
+  for(const b of BOUNDS){
+    const bp=remap(t,b-.3,b+.3);
+    if(bp>0&&bp<1){wOn=true;wipeEl.style.opacity=Math.sin(bp*Math.PI).toFixed(3);wipeEl.style.left=(bp*106-3).toFixed(2)+'%';}
+  }
+  if(!wOn)wipeEl.style.opacity='0';
+  updateCaption(t);updateHUD(t);
+}
+/* ================= init ================= */
+SCENES.forEach(s=>s.el=$(s.id));
+const RENDER_MODE=new URLSearchParams(location.search).get('render')==='1';
+let READY=false;
+(async function(){
+  await Promise.all([...document.images].map(im=>im.complete?1:new Promise(r=>{im.onload=r;im.onerror=r;})));
+  try{await document.fonts.ready;}catch(e){}
+  render(0);READY=true;window.READY=true;
+})();
+if(!RENDER_MODE){
+  let t0=null;
+  (function loop(ts){if(t0===null)t0=ts;const t=(ts-t0)/1000;
+    if(t>TOTAL){render(TOTAL);return;}render(t);requestAnimationFrame(loop);})(0);
+}else{
+  window.SEEK=t=>render(Math.max(0,Math.min(TOTAL,t)));
+}
+</script>
+</body>
+</html>

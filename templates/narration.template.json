@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "note": "Split your narration script into one chapter per scene, one line per spoken sentence. Lines are the atoms of the whole pipeline: every visual beat is keyed to a line index, captions are drawn from these texts, and audio is assembled from their measured durations.",
+    "voice": "en-US-AndrewMultilingualNeural",
+    "rate": "+8%",
+    "line_gap": 0.35,
+    "chapter_tail": 1.4,
+    "bgm_file": "bgm.mp3",
+    "bgm_gain": 0.09
+  },
+  "chapters": [
+    {
+      "id": "hello",
+      "name": "Hello — the opening film",
+      "lead": 9.0,
+      "lines": [
+        "Hi everyone. Let me start with one simple idea.",
+        "Today, we can measure more of the world than ever before. We can read DNA, study proteins, and detect tiny signals in blood and tissue."
+      ]
+    },
+    {
+      "id": "chain",
+      "name": "One pulse, three nodes",
+      "lead": 1.2,
+      "lines": [
+        "A measurement pipeline has three simple parts.",
+        "First, the thing we want to study. Then, an instrument measures it. Finally, it produces a signal we can analyze.",
+        "But remember: the analysis works with the measured data. The decision stays human."
+      ]
+    }
+  ]
+}
