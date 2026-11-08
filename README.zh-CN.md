@@ -83,7 +83,7 @@ zsh scripts/encode.sh out.mp4         # → 成品 MP4(faststart)
 安装 skill 本体到你的 agent:
 
 ```bash
-git clone https://github.com/<you>/academic-visual-storytelling
+git clone https://github.com/zwYang2004/academic-visual-storytelling
 # Claude Code
 cp -r academic-visual-storytelling ~/.claude/skills/
 # ZCode

@@ -116,7 +116,7 @@ The skill itself (design + pipeline rules) installs into your agent:
 
 ```bash
 # Claude Code
-git clone https://github.com/<you>/academic-visual-storytelling
+git clone https://github.com/zwYang2004/academic-visual-storytelling
 cp -r academic-visual-storytelling ~/.claude/skills/
 # ZCode
 cp -r academic-visual-storytelling <workspace>/.agents/skills/
